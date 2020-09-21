@@ -1200,7 +1200,7 @@ INSERT INTO t2 VALUES('MySQL', 'MySQL', 1),
                      ('MariaDB', 'MariaDB', 1);
 ALTER TABLE t1 ADD FOREIGN KEY (f1) REFERENCES t2 (f2);
 # MDEV-33927 TODO: change the warning message
---error ER_FK_CANNOT_DELETE_PARENT
+--error ER_WRONG_FK_DEF
 ALTER TABLE t2 ADD FOREIGN KEY (f2) REFERENCES t2 (f2),
 ADD UNIQUE INDEX(f3);
 drop table t1, t2;
