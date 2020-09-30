@@ -210,17 +210,17 @@ CONSTRAINT t2_ibfk_1 FOREIGN KEY (a) REFERENCES t1(a)) ENGINE=InnoDB;
 CREATE TABLE best.t2 (a INT PRIMARY KEY, b TEXT, FULLTEXT INDEX(b),
 FOREIGN KEY (a) REFERENCES test.t1(a)) ENGINE=InnoDB;
 RENAME TABLE best.t2 TO test.t2;
-ERROR 42S01: Table 't2' already exists
-SHOW CREATE TABLE best.t2;
+SHOW CREATE TABLE test.t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
   `a` int(11) NOT NULL,
   `b` text DEFAULT NULL,
   PRIMARY KEY (`a`),
   FULLTEXT KEY `b` (`b`),
-  CONSTRAINT `t2_ibfk_1` FOREIGN KEY (`a`) REFERENCES `test`.`t1` (`a`)
+  CONSTRAINT `t2_ibfk_1` FOREIGN KEY (`a`) REFERENCES `t1` (`a`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 DROP DATABASE best;
+DROP TABLE t2;
 #
 # MDEV-17541 KILL QUERY during lock wait in FOREIGN KEY check hangs
 #
@@ -243,14 +243,12 @@ DROP TABLE t3,t1;
 # MDEV-18222 InnoDB: Failing assertion: heap->magic_n == MEM_BLOCK_MAGIC_N
 # or ASAN heap-use-after-free in dict_foreign_remove_from_cache upon CHANGE COLUMN
 #
-CREATE TABLE t1 (a INT, UNIQUE(a), KEY(a)) ENGINE=InnoDB;
-ALTER TABLE t1 ADD FOREIGN KEY (a) REFERENCES t1 (a);
+CREATE TABLE t1 (a INT, UNIQUE(a), KEY(a), c INT) ENGINE=InnoDB;
+ALTER TABLE t1 ADD FOREIGN KEY (c) REFERENCES t1 (a);
 SET SESSION FOREIGN_KEY_CHECKS = OFF;
 ALTER TABLE t1 CHANGE COLUMN a a TIME NOT NULL;
-ERROR HY000: Cannot change column 'a': used in a foreign key constraint 't1_ibfk_1' of table 'test.t1'
 ALTER TABLE t1 ADD pk INT NOT NULL AUTO_INCREMENT PRIMARY KEY;
-ALTER TABLE t1 CHANGE COLUMN a b TIME;
-ERROR 0A000: ALGORITHM=COPY is not supported. Reason: Columns participating in a foreign key are renamed. Try ALGORITHM=INPLACE
+ALTER TABLE t1 CHANGE COLUMN a a TIME;
 ALTER TABLE t1 CHANGE COLUMN a b TIME, DROP FOREIGN KEY t1_ibfk_1;
 SET SESSION FOREIGN_KEY_CHECKS = ON;
 DROP TABLE t1;
@@ -395,15 +393,15 @@ flush status;
 update t1 set data=10 where pk+1>10;
 show status like '%opened_tab%';
 Variable_name	Value
-Opened_table_definitions	4
-Opened_tables	4
+Opened_table_definitions	5
+Opened_tables	5
 flush tables;
 flush status;
 update t2 set t1_pk=11 where t1_pk+1>10;
 show status like '%opened_tab%';
 Variable_name	Value
-Opened_table_definitions	4
-Opened_tables	4
+Opened_table_definitions	5
+Opened_tables	5
 flush tables;
 flush status;
 lock tables t1 write;
@@ -429,8 +427,8 @@ foo()
 5
 show status like '%opened_tab%';
 Variable_name	Value
-Opened_table_definitions	5
-Opened_tables	5
+Opened_table_definitions	6
+Opened_tables	6
 drop function foo;
 drop table t2, t1;
 CREATE TABLE t1 (pk INT, a INT, PRIMARY KEY (pk)) ENGINE=InnoDB;
@@ -1006,7 +1004,7 @@ drop table t1;
 create table t2(a int primary key) engine=innodb;
 create table t1(a int primary key, b int) engine=innodb;
 alter table t2 add foreign key(a) references t1(a, b);
-ERROR 42000: Incorrect foreign key definition for 'foreign key without name': Key reference and table reference don't match
+ERROR 42000: Incorrect foreign key definition for 'foreign key without name': foreign-referenced fields count mismatch
 create or replace table t1(a tinyint primary key) engine innodb;
 alter table t2 add foreign key(a) references t1;
 ERROR HY000: Can't create table `test`.`t2` (errno: 150 "Foreign key constraint is incorrectly formed")
@@ -1035,10 +1033,7 @@ BEGIN;
 INSERT INTO child SET a=1;
 ERROR 23000: Cannot add or update a child row: a foreign key constraint fails (`test`.`child`, CONSTRAINT `child_ibfk_1` FOREIGN KEY (`a`) REFERENCES `parent` (`a`))
 connection default;
-TRUNCATE TABLE parent;
-ERROR 42000: Cannot truncate a table referenced in a foreign key constraint (`test`.`child`, CONSTRAINT `child_ibfk_1` FOREIGN KEY (`a`) REFERENCES `test`.`parent` (`a`))
-DROP TABLE parent;
-ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+SET lock_wait_timeout= 0;
 SET innodb_lock_wait_timeout=0;
 RENAME TABLE parent TO transparent;
 ERROR HY000: Lock wait timeout exceeded; try restarting transaction
@@ -1061,6 +1056,7 @@ connection con1;
 COMMIT;
 connection default;
 SET innodb_lock_wait_timeout=DEFAULT;
+SET lock_wait_timeout= DEFAULT;
 TRUNCATE TABLE parent;
 ALTER TABLE parent FORCE, ALGORITHM=COPY;
 ALTER TABLE parent FORCE, ALGORITHM=INPLACE;
