@@ -1193,7 +1193,6 @@ public:
   enum leaf_list_state prep_leaf_list_state;
   uint insert_tables;
   st_select_lex *merged_into; /* select which this select is merged into */
-                              /* (not 0 only for views/derived tables)   */
 
   const char *type;               /* type of select for EXPLAIN          */
 

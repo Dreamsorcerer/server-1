@@ -398,3 +398,801 @@ DROP VIEW v2;
 DROP TABLE t1,t2;
 
 set optimizer_switch= @tmp_subselect_extra_derived;
+
+--echo #
+--echo # MDEV-32294 2nd execution problem with inconsistent outer context paths
+--echo #
+
+SELECT * FROM (
+    WITH RECURSIVE x ( a ) AS ( SELECT 1 UNION SELECT a FROM x )
+    SELECT * FROM x
+    WHERE a IN (
+        SELECT a FROM x WHERE ( SELECT 1 GROUP BY a HAVING ( a ) )
+        )
+) as dt ;
+
+create table t1 (t1a int, t1b int, t1c int) engine=myisam;
+insert into t1 values (1, 1, 1), (2, 2, 2), (3, 3, 3);
+
+create table t2 (t2a int, t2b int, t2c int) engine=myisam;
+insert into t2 values (1, 1, 1), (2, 2, 2), (3, 3, 3);
+
+create table t3 (t3a int, t3b int, t3c int) engine=myisam;
+insert into t3 values (1, 1, 1), (2, 2, 2), (3, 3, 3);
+
+create table t4 (t4a int, t4b int, t4c int) engine=myisam;
+insert into t4 values (1, 1, 1), (2, 2, 2), (3, 3, 3);
+
+create table t5 (t5a int, t5b int, t5c int) engine=myisam;
+insert into t5 values (1, 1, 1), (2, 2, 2), (3, 3, 3);
+
+create table t6 (t6a int, t6b int, t6c int) engine=myisam;
+insert into t6 values (1, 1, 1), (2, 2, 2), (3, 3, 3);
+
+let $q=select t1a from t1
+where t1a in
+(
+  select t2c from t2 where t2a >= some
+  (
+    select t3a from t3 where t1b=t3b
+  )
+);
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo rewrite query
+let $q=select t1a from t1
+where t1a in
+(
+  select t2c from t2
+    where (select t3a from t3 where t1b=t3b and t2a>t3a) <> 0
+);
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo The root of the problem, outer reference but no merge yet
+let $q=select * from t1
+  where t1c in
+  (
+    select t2a from t2
+       where (select t3a from t3 where t1b=t3b and t2a>t3a) <> 0
+  );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo reference to top select, it isn't merged into anything
+let $q=select * from
+(
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where (select t3b from t3 where t3a > t1a limit 1) <> 0
+    )
+) dt;
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo basic tower
+let $q=select * from
+(
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where t2a < any(select t3b from t3)
+    )
+) dt;
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+let $q=select * from
+(
+  select * from t1
+    where t1c in
+    (
+      select t2a from t2
+        where t2a in
+        (
+          select t3a from t3
+            where t3a in
+            (
+               select t4a from t4
+                 where t4a < any(select t5c from t5)
+            )
+        )
+    )
+) dt;
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+
+--echo tower, no wrapper + reference to first level select
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select t2a from t2
+        where t2a in
+        (
+          select t3a from t3
+            where t3a in
+            (
+               select t4a from t4
+                 where t4a < any(select t5c from t5 where t5a > t1a)
+            )
+        )
+    );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t4a from t4
+         join t2 on t2a = t4a
+         join t3 on t3a < any(select t5c from t5 where t2a > 0)
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=select * from
+(
+  select * from t1
+    where t1c in
+    (
+       select t4a from t4
+         join t2 on t2a = t4a
+         join t3 on t3a = (select min(t5c) from t5 where t2a > 0)
+    )
+) dt;
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tallest tower
+let $q=select * from
+(
+  select * from t1
+    where t1c in
+    (
+       select t4a from t4
+         join t2 on t2a = t4a
+         join t3 on t3b > 0 and t3a = (select min(t5c) from t5 where t2a > 0)
+    )
+) dt;
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t4a from t4
+         left join t2 on t2a = t4a
+         join t3 on t3b > 0 and t3a = (select min(t5c) from t5 where t2a > 0)
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t4a from t4
+         left join t2 on t2a = t4a
+         join t3 on t3b > 0 and t3a = (select min(t5c) from t5
+                                     where (select min(t2a+t6a) from t6) > 0)
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t4a from t4
+         join t2 on t2a = t4a
+         left join t3 on t3a = (select min(t5c) from t5 where t2a > 0)
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select t2a from 
+      ( select t2a from t2
+          where t2a in
+          (
+            select t3a from t3
+              where t3a in
+              (
+                 select t4a from t4
+                   where t4a < any(select t5c from t5 where t5a > t2a)
+              )
+          )
+      ) dt2
+    );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tallest tower, internal wrapper + reference to first internal select
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select * from
+      (
+        select t2a from (select * from t2) table2
+          where t2a in
+          (
+            select t3a from t3
+              where t3a in
+              (
+                 select t4a from t4
+                   where t4a < any(select t5c from t5 where t5a > t2a)
+              )
+          )
+      ) dt
+    );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+
+--echo with having
+let $q=
+  select * from t1
+     where t1a in
+     (
+       select t2a from t2
+       where ( select t3b from t3 where t3b < 3 group by t1a having t1a > 0 )
+     );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+--echo tower, internal wrapper 1
+let $q=
+select * from t1
+  where t1c in
+  (
+    select t2a from t2
+      where t2a in
+      (
+        select * from
+        (
+          select t3a from t3
+            where t3a in
+            (
+              select t4a from t4
+                where t4a < any(select t5c from t5 group by t3a having t3a > 0)
+            )
+        ) dt
+      )
+  );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tower, internal wrapper 2
+let $q=
+select * from t1
+  where t1c in
+  (
+    select * from
+    (
+      select t2a from t2
+        where t2a in
+        (
+          select t3a from t3
+            where t3a in
+            (
+              select t4a from t4
+                where t4a < any(select t5c from t5 group by t3a having t3a > 0)
+            )
+        )
+    ) dt
+  );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo crashes on first execution having -> where, refix -> boom
+let $q=
+  select * from t1
+     where t1a in
+     (
+       select t2a from t2
+       where ( select t3b from t3 where t3b < 3 group by t2a having t2a > 0 )
+     );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+--echo tower, internal wrapper 
+let $q=
+select * from t1
+  where t1c in
+  (
+    select * from
+    (
+      select t2a from t2
+        where t2a in
+        (
+          select t3a from t3
+            where t3a in
+            (
+              select t4a from t4
+                where t4a < any(select t5c from t5 group by t5a
+                               having t5a > t3a)
+            )
+        )
+    ) dt
+  );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tower, internal wrapper + reference to wrapped second internal select
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select * from
+      (
+        select t2a from t2
+          where t2a in
+          (
+            select t3a from (select * from t3) table3
+              where t3a in
+              (
+                 select t4a from t4
+                   where t4a < any(select t5c from t5 where t5a > table3.t3a)
+              )
+          )
+      ) dt
+    );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tower, internal wrapper + reference to wrapped second internal select
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select * from
+      (
+        select t2a from t2
+          where t2a in
+          (
+            select t3a from (select * from t3) table3
+              where t3a in
+              (
+                 select t4a from t4
+                   where t4a < any(select t5c from t5 where t5a > t3a)
+              )
+          )
+      ) dt
+    );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tallest tower, internal wrapper + reference to second internal select
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select * from
+      (
+        select t2a from t2
+          where t2a in
+          (
+            select t3a from t3
+              where t3a in
+              (
+                 select t4a from t4
+                   where t4a < any(select t5c from t5 where t5a > t3a)
+              )
+          )
+      ) dt
+    );
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tallest tower + reference to third level select
+let $q=select * from
+(
+  select * from t1
+    where t1c in
+    (
+      select t2a from t2
+        where t2a in
+        (
+          select t3a from t3
+            where t3a in
+            (
+               select t4a from t4
+                 where t4a < any(select t5c from t5 where t5a > t3a)
+            )
+        )
+    )
+) dt;
+eval $q;
+eval prepare s from '$q';
+execute s;
+execute s;
+
+--echo tower + reference to second level select
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select t2a from t2
+        where t2a in
+        (
+          select t3a from t3
+            where t3a in
+            (
+               select t4a from t4
+                 where t4a < any(select t5c from t5 where t5a > t2a)
+            )
+        )
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+
+--echo tallest tower + reference to upper select
+let $q=
+  select * from t1
+    where t1c in
+    (
+      select t2a from t2
+        where t2a in
+        (
+          select t3a from t3
+            where t3a in
+            (
+               select t4a from t4
+                 where t4a < any(select t5c from t5 where t5a > t4a)
+            )
+        )
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+--echo basic tower + reference to top select
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where t2a < any(select t3b from t3 where t1a > 2)
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+--echo reference to middle select
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where t2a < any(select t3b from t3 where t2a > 2)
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where (select t3b from t3 where t3a > t2a limit 1) <> 0
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where ( select min(t3b) from t3 where t1a > 2 and t2b < 2 ) <> 0
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where ( select t3b from t3 where t1a > 2 and t3b < 2 ) <> 0
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+let $q=
+  select * from t1
+    where t1c in
+    (
+       select t2a from t2
+         where ( select min(t3b) from t3 where t1a > 2 and t2b < 2 ) <> 0
+    );
+
+let $oq=select * from ($q) dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+let $oq=with dt as ($q) select * from dt;
+eval $oq;
+eval prepare s from '$oq';
+execute s;
+execute s;
+
+eval create view v1 as $q;
+select * from v1;
+prepare s from 'select * from v1';
+execute s;
+execute s;
+drop view v1;
+
+drop table t1,t2,t3,t4,t5,t6;
+
+--echo # end of 10.5 tests

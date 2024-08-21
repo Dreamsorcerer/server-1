@@ -181,11 +181,22 @@ void view_error_processor(THD *thd, void *data);
 */
 struct Name_resolution_context: Sql_alloc
 {
+  private:
   /*
     The name resolution context to search in when an Item cannot be
     resolved in this context (the context of an outer select)
   */
   Name_resolution_context *outer_context;
+
+
+  public:
+  st_select_lex           *outer_select();
+  Name_resolution_context *get_outer_context()     { return outer_context; };
+  void set_outer_context(Name_resolution_context *context)
+    { outer_context= context; };
+
+  st_select_lex     *get_select_lex();
+  void              set_select_lex (st_select_lex *sl)   { select_lex= sl; };
 
   /*
     List of tables used to resolve the items of this context.  Usually these
@@ -212,12 +223,14 @@ struct Name_resolution_context: Sql_alloc
 
   /* Cache first_name_resolution_table in setup_natural_join_row_types */
   TABLE_LIST *natural_join_first_table;
+  private:
   /*
     SELECT_LEX item belong to, in case of merged VIEW it can differ from
     SELECT_LEX where item was created, so we can't use table_list/field_list
     from there
   */
   st_select_lex *select_lex;
+  public:
 
   /*
     Processor of errors caused during Item name resolving, now used only to
@@ -265,12 +278,6 @@ struct Name_resolution_context: Sql_alloc
   void process_error(THD *thd)
   {
     (*error_processor)(thd, error_processor_data);
-  }
-  st_select_lex *outer_select()
-  {
-    return (outer_context ?
-            outer_context->select_lex :
-            NULL);
   }
 };
 

@@ -1970,6 +1970,7 @@ static bool convert_subq_to_sj(JOIN *parent_join, Item_in_subselect *subq_pred)
 
   /* Unlink the child select_lex so it doesn't show up in EXPLAIN: */
   subq_lex->master_unit()->exclude_level();
+  subq_lex->merged_into= parent_lex;
 
   DBUG_EXECUTE("where",
                print_where(sj_nest->sj_on_expr,"SJ-EXPR", QT_ORDINARY););
