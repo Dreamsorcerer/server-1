@@ -1596,6 +1596,71 @@ static void reset_equality_number_for_subq_conds(Item * cond)
   return;
 }
 
+
+/*
+  Update Item_subselect::used_tables_cache & key coverage for subselect
+  items in our query
+
+  SYNOPSIS
+    update_resolved_items_used_tables()
+        select_lex      the SELECT_LEX that has had an altered list of incoming
+                        resolution item references.
+
+  DESCRIPTION
+
+  RETURN
+    FALSE  OK
+    TRUE   An error occured
+ */
+
+bool st_select_lex::update_resolved_items_used_tables()
+{
+  if (!resolved_here ||
+      !resolved_here->elements)
+    return FALSE;
+
+  List_iterator_fast<Ref_to_here>  it( *resolved_here );
+  Ref_to_here *ref;
+
+  // for each item resolved in this SELECT_LEX
+  while ((ref= it++))
+  {
+    Item_field *item= ref->item;
+    SELECT_LEX *lower_select= ref->select_lex;
+    if (item->can_be_depended)
+      item->depended_from= this;
+
+    item->update_table_bitmaps();
+
+    // for all the SELECT_LEXs starting with where this item was defined
+    // up to but not including the current level
+    Item_subselect *subselect_item;
+    while (lower_select->nest_level > nest_level)
+    {
+      // set the outer bit flag on this lower select's subselect_item
+      subselect_item= lower_select->master_unit()->item;
+      subselect_item->join_utc( OUTER_REF_TABLE_BIT );
+      // move up a level
+      // skipping excluded SELECT_LEXs, they aren't needed
+      lower_select= lower_select->outer_select();
+      // not skipping for now to see how bitmaps match up
+      // lower_select= lower_select->context.outer_select();
+    }
+
+    // item is resolved here, collect table usage and integrate it into
+    // this subselect_item
+    if (join->conds &&
+        join->conds->type() == Item::SUBSELECT_ITEM)
+    {
+      Item_subselect *sub= (Item_subselect*) join->conds;
+      sub->join_utc( item->field->table->map );
+    }
+  }
+
+  return FALSE;
+}
+
+
 /*
   Convert a subquery predicate into a TABLE_LIST semi-join nest
 
@@ -1970,6 +2035,25 @@ static bool convert_subq_to_sj(JOIN *parent_join, Item_in_subselect *subq_pred)
 
   /* Unlink the child select_lex so it doesn't show up in EXPLAIN: */
   subq_lex->master_unit()->exclude_level();
+  subq_lex->merged_into= parent_lex;
+  if (subq_lex->resolved_here)
+  {
+    if (!parent_lex->resolved_here)
+      parent_lex->resolved_here= subq_lex->resolved_here;
+    else
+    {
+      parent_lex->resolved_here->append(subq_lex->resolved_here);
+      subq_lex->resolved_here= nullptr;
+    }
+    /*
+      TODO, If parent_lex is enclosed in an Item_subselect
+      OUTER_REF_TABLE_BIT in used_tables_cache might not need to be set anymore
+      is this the correct place to unset this bit?
+     */
+
+    if (parent_lex->update_resolved_items_used_tables())
+      goto restore_tl_and_exit;
+  }
 
   DBUG_EXECUTE("where",
                print_where(sj_nest->sj_on_expr,"SJ-EXPR", QT_ORDINARY););

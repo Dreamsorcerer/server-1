@@ -3064,6 +3064,7 @@ void st_select_lex::init_query()
   versioned_tables= 0;
   pushdown_select= 0;
   orig_names_of_item_list_elems= 0;
+  resolved_here= 0;
 }
 
 void st_select_lex::init_select()
@@ -3112,6 +3113,7 @@ void st_select_lex::init_select()
   is_tvc_wrapper= false;
   nest_flags= 0;
   orig_names_of_item_list_elems= 0;
+  resolved_here= 0;
 }
 
 /*

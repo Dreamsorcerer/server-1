@@ -210,9 +210,11 @@ public:
   void make_const()
   { 
     used_tables_cache= 0;
+    new_used_tables_cache= 0;
     const_item_cache= 0;
     forced_const= TRUE; 
   }
+  void join_utc(table_map newmap) { new_used_tables_cache|= newmap; }
   virtual bool fix_length_and_dec();
   table_map used_tables() const override;
   table_map not_null_tables() const override { return 0; }
@@ -285,6 +287,8 @@ public:
   Item *do_get_copy(THD *thd) const override { return 0; }
 
   st_select_lex *wrap_tvc_into_select(THD *thd, st_select_lex *tvc_sl);
+
+  bool update_resolved_items_used_tables();
 
   friend class select_result_interceptor;
   friend class Item_in_optimizer;

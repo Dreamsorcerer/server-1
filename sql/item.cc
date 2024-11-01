@@ -5383,8 +5383,8 @@ void mark_select_range_as_dependent(THD *thd, SELECT_LEX *last_select,
     resolving)
   */
   SELECT_LEX *previous_select= current_sel;
-  for (; previous_select->context.outer_select() != last_select;
-       previous_select= previous_select->context.outer_select())
+  for (; previous_select->outer_select() != last_select;
+       previous_select= previous_select->outer_select())
   {
     Item_subselect *prev_subselect_item=
       previous_select->master_unit()->item;
@@ -5834,6 +5834,34 @@ Item_field::fix_outer_field(THD *thd, Field **from_field, Item **reference)
         }
         if (*from_field != view_ref_found)
         {
+          /*
+            Populate the resolved_here list in statement memory
+          */
+          if (thd->stmt_arena->is_stmt_prepare_or_first_stmt_execute() ||
+                  thd->stmt_arena->is_conventional())
+          {
+            Query_arena *arena, backup;
+            arena= thd->activate_stmt_arena_if_needed(&backup);
+
+            if (!select->resolved_here)
+            {
+              if (!(select->resolved_here= new (thd->mem_root)
+                                             List<SELECT_LEX::Ref_to_here>))
+                return -1;
+            }
+
+            SELECT_LEX::Ref_to_here *ref= new (thd->mem_root)
+                                          SELECT_LEX::Ref_to_here;
+            if (!ref)
+              return -1;
+
+            ref->item= this;
+            ref->select_lex= context->select_lex;
+            select->resolved_here->push_back( ref, thd->mem_root);
+            if (arena)
+              thd->restore_active_arena(arena, &backup);
+          }
+
           prev_subselect_item->used_tables_cache|= (*from_field)->table->map;
           prev_subselect_item->const_item_cache= 0;
           set_field(*from_field);
@@ -8235,6 +8263,7 @@ bool Item_ref::fix_fields(THD *thd, Item **reference)
           if (from_field != not_found_field)
           {
             if (cached_table && cached_table->select_lex &&
+                outer_context && outer_context->outer_context &&
                 outer_context->select_lex &&
                 cached_table->select_lex != outer_context->select_lex)
             {
@@ -8251,6 +8280,7 @@ bool Item_ref::fix_fields(THD *thd, Item **reference)
                   last_checked_context->select_lex->master_unit()->item;
                 last_checked_context= outer_context;
               } while (outer_context && outer_context->select_lex &&
+                       outer_context->outer_context &&
                        cached_table->select_lex != outer_context->select_lex);
             }
             prev_subselect_item->used_tables_cache|= from_field->table->map;

@@ -5279,24 +5279,29 @@ public:
     (even internally in Item_func_* code).
   */
   table_map used_tables_cache;
+  table_map new_used_tables_cache;
   bool const_item_cache;
 
   Used_tables_and_const_cache()
    :used_tables_cache(0),
+    new_used_tables_cache(0),
     const_item_cache(true)
   { }
   Used_tables_and_const_cache(const Used_tables_and_const_cache *other)
    :used_tables_cache(other->used_tables_cache),
+    new_used_tables_cache(other->new_used_tables_cache),
     const_item_cache(other->const_item_cache)
   { }
   void used_tables_and_const_cache_init()
   {
     used_tables_cache= 0;
+    new_used_tables_cache= 0;
     const_item_cache= true;
   }
   void used_tables_and_const_cache_join(const Item *item)
   {
     used_tables_cache|= item->used_tables();
+    new_used_tables_cache|= item->used_tables();
     const_item_cache&= item->const_item();
   }
   void used_tables_and_const_cache_update_and_join(Item *item)

@@ -1267,6 +1267,16 @@ public:
   bool having_fix_field_for_pushed_cond;
   /* List of references to fields referenced from inner selects */
   List<Item_outer_ref> inner_refs_list;
+
+  /* List of Items that are in inner selects but resolved here */
+  struct Ref_to_here : public Sql_alloc
+  {
+    Item_field *item;           // item in inner select
+    st_select_lex *select_lex;  // the inner select
+  };
+  List<Ref_to_here> *resolved_here;
+  bool update_resolved_items_used_tables();
+
   /* Number of Item_sum-derived objects in this SELECT */
   uint n_sum_items;
   /* Number of Item_sum-derived objects in children and descendant SELECTs */

@@ -344,7 +344,10 @@ bool Item_subselect::fix_fields(THD *thd_param, Item **ref)
   {
     const_item_cache= 0;
     if (uncacheable & UNCACHEABLE_RAND)
+    {
       used_tables_cache|= RAND_TABLE_BIT;
+      new_used_tables_cache|= RAND_TABLE_BIT;
+    }
   }
   fixed= 1;
 
@@ -3539,6 +3542,7 @@ void Item_in_subselect::fix_after_pullout(st_select_lex *new_parent,
   left_expr->fix_after_pullout(new_parent, &left_expr, merge);
   Item_subselect::fix_after_pullout(new_parent, ref, merge);
   used_tables_cache |= left_expr->used_tables();
+  new_used_tables_cache |= left_expr->used_tables();
 }
 
 void Item_in_subselect::update_used_tables()
@@ -3547,6 +3551,7 @@ void Item_in_subselect::update_used_tables()
   left_expr->update_used_tables();
   //used_tables_cache |= left_expr->used_tables();
   used_tables_cache= Item_subselect::used_tables() | left_expr->used_tables();
+  new_used_tables_cache= Item_subselect::used_tables() | left_expr->used_tables();
 }
 
 
