@@ -399,6 +399,22 @@ void ha_sequence::print_error(int error, myf errflag)
   DBUG_VOID_RETURN;
 }
 
+int ha_sequence::check(THD* thd, HA_CHECK_OPT* check_opt)
+{
+  DBUG_ENTER("ha_sequence::check");
+  int ret= 0;
+  /* Underlying engine check */
+  if ((ret= file->check(thd, check_opt)))
+    DBUG_RETURN(ret);
+  /* Check number of rows */
+  if ((file->table_flags() & HA_STATS_RECORDS_IS_EXACT) && file->stats.records > 1)
+    DBUG_RETURN(1);
+  /* Check and adjust sequence state */
+  if ((ret= sequence->check_and_adjust(thd, false)))
+    DBUG_RETURN(ret);
+  DBUG_RETURN(0);
+}
+
 /*****************************************************************************
   Sequence plugin interface
 *****************************************************************************/
