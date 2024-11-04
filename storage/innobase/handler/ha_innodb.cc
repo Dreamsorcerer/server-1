@@ -5593,8 +5593,8 @@ innobase_build_v_templ(
 @param[in]	table	table object formed from .frm
 @param[in]	ib_table	InnoDB table definition
 @retval	true if not errors were found */
-static bool
-check_index_consistency(const TABLE* table, const dict_table_t* ib_table)
+bool
+ha_innobase::check_index_consistency(const dict_table_t* ib_table) noexcept
 {
 	ulint mysql_num_index = table->s->keys;
 	ulint ib_num_index = UT_LIST_GET_LEN(ib_table->indexes);
@@ -5632,6 +5632,20 @@ check_index_consistency(const TABLE* table, const dict_table_t* ib_table)
 					table->key_info[count].name.str);
 			ret = false;
 			goto func_exit;
+		}
+
+		if (index->is_unique()) {
+			ulint n_index= 0;
+			for (dict_index_t *idx =
+				UT_LIST_GET_FIRST(ib_table->indexes);
+			     idx; idx= UT_LIST_GET_NEXT(indexes, idx)) {
+
+				if (idx == index && count != n_index) {
+					m_int_table_flags|=
+						HA_DUPLICATE_KEY_NOT_IN_ORDER;
+				}
+				n_index++;
+			}
 		}
 	}
 
@@ -5874,7 +5888,7 @@ ha_innobase::open(const char* name, int, uint)
 		mutex_exit(&dict_sys.mutex);
 	}
 
-	if (!check_index_consistency(table, ib_table)) {
+	if (!check_index_consistency(ib_table)) {
 		sql_print_error("InnoDB indexes are inconsistent with what "
 				"defined in .frm for table %s",
 				name);

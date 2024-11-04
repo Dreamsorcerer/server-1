@@ -1202,3 +1202,17 @@ call mtr.add_suppression("Plugin 'InnoDB' init function returned error");
 call mtr.add_suppression("Plugin 'InnoDB' registration as a STORAGE ENGINE failed");
 
 --enable_query_log
+
+--echo #
+--echo #  MDEV-35115 Inconsistent Replace behaviour when multiple
+--echo #               unique index exist
+--echo #
+CREATE TABLE t1 (c1 NUMERIC UNSIGNED NOT NULL,
+		 c2 INT3 UNIQUE,
+		 c3 BIT(2) PRIMARY KEY)ENGINE=InnoDB;
+CREATE UNIQUE INDEX i1 ON t1(c1);
+INSERT INTO t1 (c1,c2,c3) VALUES (0,0,b'01');
+INSERT INTO t1 (c1,c2,c3) VALUES (1,1,b'10');
+REPLACE INTO t1 (c1,c2,c3) VALUES (0,1,b'11');
+SELECT * FROM t1;
+DROP TABLE t1;

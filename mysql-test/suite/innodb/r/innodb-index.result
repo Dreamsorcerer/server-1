@@ -1947,3 +1947,18 @@ Warnings:
 Warning	1082	InnoDB: Table test/t contains 0 indexes inside InnoDB, which is different from the number of indexes 1 defined in the MariaDB 
 Warning	1082	InnoDB: Table test/t contains 0 indexes inside InnoDB, which is different from the number of indexes 1 defined in the MariaDB 
 DROP TABLE t;
+#
+#  MDEV-35115 Inconsistent Replace behaviour when multiple
+#               unique index exist
+#
+CREATE TABLE t1 (c1 NUMERIC UNSIGNED NOT NULL,
+c2 INT3 UNIQUE,
+c3 BIT(2) PRIMARY KEY)ENGINE=InnoDB;
+CREATE UNIQUE INDEX i1 ON t1(c1);
+INSERT INTO t1 (c1,c2,c3) VALUES (0,0,b'01');
+INSERT INTO t1 (c1,c2,c3) VALUES (1,1,b'10');
+REPLACE INTO t1 (c1,c2,c3) VALUES (0,1,b'11');
+SELECT * FROM t1;
+c1	c2	c3
+0	1	
+DROP TABLE t1;
