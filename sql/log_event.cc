@@ -1409,7 +1409,10 @@ code_name(int code)
   case Q_MASTER_DATA_WRITTEN_CODE: return "Q_MASTER_DATA_WRITTEN_CODE";
   case Q_HRNOW: return "Q_HRNOW";
   }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   sprintf(buf, "CODE#%d", code);
+#pragma clang diagnostic pop
   return buf;
 }
 #endif

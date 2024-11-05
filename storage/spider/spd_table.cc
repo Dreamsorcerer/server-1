@@ -3959,7 +3959,10 @@ int spider_create_conn_keys(
     int counter= 0;
     spider_create_conn_key_add_one(&counter, &tmp_name, share->tgt_wrappers[roop_count]);
     spider_create_conn_key_add_one(&counter, &tmp_name, share->tgt_hosts[roop_count]);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     my_sprintf(port_str, (port_str, "%05ld", share->tgt_ports[roop_count]));
+#pragma GCC diagnostic pop
     spider_create_conn_key_add_one(&counter, &tmp_name, port_str);
     spider_create_conn_key_add_one(&counter, &tmp_name, share->tgt_sockets[roop_count]);
     counter++;
@@ -4090,7 +4093,10 @@ SPIDER_SHARE *spider_create_share(
   for (roop_count = 0; roop_count < (int) share->all_link_count;
     roop_count++)
   {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     my_sprintf(link_idx_str, (link_idx_str, "%010d", roop_count));
+#pragma GCC diagnostic pop
     buf_pos = strmov(buf, share->table_name);
     buf_pos = strmov(buf_pos, link_idx_str);
     *buf_pos = '\0';
@@ -6239,9 +6245,12 @@ int spider_db_init(
     bzero(addr,6);
   }
   spider_unique_id.str = spider_unique_id_buf;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   spider_unique_id.length = my_sprintf(spider_unique_id_buf,
     (spider_unique_id_buf, "-%02x%02x%02x%02x%02x%02x-%lx-",
       addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], (ulong) getpid()));
+#pragma GCC diagnostic pop
 
   memset(&spider_alloc_func_name, 0, sizeof(spider_alloc_func_name));
   memset(&spider_alloc_file_name, 0, sizeof(spider_alloc_file_name));

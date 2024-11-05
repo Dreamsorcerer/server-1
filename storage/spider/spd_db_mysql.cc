@@ -2781,8 +2781,11 @@ int spider_db_mbase::set_wait_timeout(
   DBUG_PRINT("info",("spider this=%p", this));
   sql_str.init_calc_mem(SPD_MID_DB_MBASE_SET_WAIT_TIMEOUT_1);
   sql_str.length(0);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   timeout_str_length =
     my_sprintf(timeout_str, (timeout_str, "%d", wait_timeout));
+#pragma clang diagnostic pop
   if (sql_str.reserve(SPIDER_SQL_WAIT_TIMEOUT_LEN + timeout_str_length))
     DBUG_RETURN(HA_ERR_OUT_OF_MEM);
   sql_str.q_append(SPIDER_SQL_WAIT_TIMEOUT_STR, SPIDER_SQL_WAIT_TIMEOUT_LEN);
@@ -3804,8 +3807,11 @@ int spider_db_mbase_util::append_wait_timeout(
   int timeout_str_length;
   DBUG_ENTER("spider_db_mbase_util::append_wait_timeout");
   DBUG_PRINT("info",("spider this=%p", this));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   timeout_str_length =
     my_sprintf(timeout_str, (timeout_str, "%d", wait_timeout));
+#pragma clang diagnostic pop
   if (str->reserve(SPIDER_SQL_SEMICOLON_LEN + SPIDER_SQL_WAIT_TIMEOUT_LEN +
     timeout_str_length))
   {
@@ -7781,7 +7787,10 @@ int spider_mbase_handler::append_key_column_types(
     key_count++
   ) {
     field = key_part->field;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     key_name_length = my_sprintf(tmp_buf, (tmp_buf, "c%u", key_count));
+#pragma clang diagnostic pop
     if (str->reserve(key_name_length + SPIDER_SQL_SPACE_LEN))
       DBUG_RETURN(HA_ERR_OUT_OF_MEM);
     str->q_append(tmp_buf, key_name_length);
@@ -7861,7 +7870,10 @@ int spider_mbase_handler::append_key_join_columns_for_bka(
     field = key_part->field;
     key_name_length =
       mysql_share->column_name_str[field->field_index].length();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     length = my_sprintf(tmp_buf, (tmp_buf, "c%u", key_count));
+#pragma clang diagnostic pop
     if (str->reserve(length + table_alias_lengths[0] + key_name_length +
       /* SPIDER_SQL_NAME_QUOTE_LEN */ 2 +
       table_alias_lengths[1] + SPIDER_SQL_PF_EQUAL_LEN + SPIDER_SQL_AND_LEN))
@@ -8010,9 +8022,14 @@ void spider_mbase_handler::create_tmp_bka_table_name(
     memcpy(tmp_table_name, mysql_share->db_names_str[link_idx].c_ptr(),
       mysql_share->db_names_str[link_idx].length());
     tmp_table_name += mysql_share->db_names_str[link_idx].length();
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     length = my_sprintf(tmp_table_name, (tmp_table_name,
       "%s%s%p%s", SPIDER_SQL_DOT_STR, SPIDER_SQL_TMP_BKA_STR, spider,
       SPIDER_SQL_UNDERSCORE_STR));
+#pragma clang diagnostic pop
+
     *tmp_table_name_length += length;
     tmp_table_name += length;
     memcpy(tmp_table_name,
@@ -8028,8 +8045,12 @@ void spider_mbase_handler::create_tmp_bka_table_name(
     memcpy(tmp_table_name, mysql_share->db_names_str[link_idx].c_ptr(),
       mysql_share->db_names_str[link_idx].length());
     tmp_table_name += mysql_share->db_names_str[link_idx].length();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     length = my_sprintf(tmp_table_name, (tmp_table_name,
       "%s%s%p", SPIDER_SQL_DOT_STR, SPIDER_SQL_TMP_BKA_STR, spider));
+#pragma clang diagnostic pop
+
     *tmp_table_name_length += length;
   }
   DBUG_VOID_RETURN;
@@ -9622,7 +9643,10 @@ int spider_mbase_handler::append_key_column_values_with_name(
         DBUG_RETURN(HA_ERR_OUT_OF_MEM);
     }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     key_name_length = my_sprintf(tmp_buf, (tmp_buf, "c%u", key_count));
+#pragma clang diagnostic pop
     if (str->reserve(SPIDER_SQL_SPACE_LEN + key_name_length +
       SPIDER_SQL_COMMA_LEN))
       DBUG_RETURN(HA_ERR_OUT_OF_MEM);
@@ -11209,8 +11233,12 @@ int spider_mbase_handler::append_multi_range_cnt(
   char range_cnt_str[SPIDER_SQL_INT_LEN];
   DBUG_ENTER("spider_mbase_handler::append_multi_range_cnt");
   DBUG_PRINT("info",("spider this=%p", this));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   range_cnt_length = my_sprintf(range_cnt_str, (range_cnt_str, "%u",
     multi_range_cnt));
+#pragma clang diagnostic pop
+
   if (with_comma)
   {
     if (str->reserve(range_cnt_length + SPIDER_SQL_COMMA_LEN))
@@ -11256,8 +11284,12 @@ int spider_mbase_handler::append_multi_range_cnt_with_name(
   char range_cnt_str[SPIDER_SQL_INT_LEN];
   DBUG_ENTER("spider_mbase_handler::append_multi_range_cnt_with_name");
   DBUG_PRINT("info",("spider this=%p", this));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   range_cnt_length = my_sprintf(range_cnt_str, (range_cnt_str, "%u",
     multi_range_cnt));
+#pragma clang diagnostic pop
+
   if (str->reserve(range_cnt_length + SPIDER_SQL_SPACE_LEN +
     SPIDER_SQL_ID_LEN + SPIDER_SQL_COMMA_LEN))
     DBUG_RETURN(HA_ERR_OUT_OF_MEM);

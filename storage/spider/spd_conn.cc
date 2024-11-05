@@ -3368,8 +3368,11 @@ int spider_create_mon_threads(
               share->static_link_ids_lengths[roop_count] + 1);
             link_idx_str_length = share->static_link_ids_lengths[roop_count];
           } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             link_idx_str_length = my_sprintf(link_idx_str, (link_idx_str,
               "%010d", roop_count));
+#pragma clang diagnostic pop
           }
           conv_name_str.q_append(link_idx_str, link_idx_str_length + 1);
           conv_name_str.length(conv_name_str.length() - 1);
